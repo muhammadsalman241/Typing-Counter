@@ -1,0 +1,8 @@
+Enviroment	: Windows NT
+Compiler 	: MINGW
+IDE 		: Devc++ 5.1
+
+About Code:
+Its an single file compilation method, open the tc_driver.cpp file in ur Devc++ (Must use Devc++),
+And compile it all will done!
+All four file named conTools, TCutilites, TCroutine, Tcounter are maded as include file (head ache of preprocessor)

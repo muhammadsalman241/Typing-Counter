@@ -1,0 +1,319 @@
+/*
+* File 			: TypingCounter
+* Description 	: Main class of TC v-3. 
+* Author 		: AIM
+* Started on 	: 29/01/2017
+* Created on 	: 13/02/2017
+* Copyright (c) 2016, 2020
+*/
+
+#ifndef Tcounter
+#define Tcounter
+
+#include "TCutilities"
+#include "TCroutines"
+
+using namespace std;
+
+class TypingCounter{
+	private:
+		menu 			main_menu, 
+						time_menu;
+		user_handler 	user_db;
+		graph_handler 	pgraph_db;
+		string 			paragraph, 
+						user;
+		statics 		typing_statics;
+		clock_t 		t_limit;
+		bool 			is_time_apply;
+		
+		static const int 
+						no_main_menu_options = 4,
+						no_time_menu_options = 4;
+						
+		string			main_menu_options[ no_main_menu_options ],
+					 	time_options     [ no_time_menu_options ];
+		enum main_menu_codes{ START, HELP, ABOUT, EXIT, START_FROM_BEGIN };
+		
+		inline void programs_title(){
+			methods::underline( 
+								string("")+static_cast<char>(4)+"Typing Counter"+static_cast<char>(4),
+								 ' ', 
+								true
+							);
+			cout << endl;
+		}
+		inline bool is_time_up(clock_t &start_t){
+			return ( (clock() - start_t) >= t_limit );
+		}
+		inline void draw_paragraph(){
+			BYTE temp;
+			cout << line << paragraph;
+			if((temp = wherex()) != 80)
+			 cout << setw(SWIDTH - temp + 1) << "";
+			cout << line << endl;
+		}
+		inline void show_help(){
+			string content;
+			ifstream txt("Tc_db\\Help.tcf");
+			getline(txt, content, static_cast<char>(EOF));
+			programs_title();
+			cout << content;
+			getch();
+		}
+		inline void show_about(){
+			string content;
+			ifstream txt("Tc_db\\About.tcf");
+			getline(txt, content, static_cast<char>(EOF));
+			programs_title();
+			cout << content;
+			getch();
+		}
+		void wellcome();
+		void start_program_flow();
+		void init_test_enviroment();
+		void start_type();
+	public:
+		TypingCounter();
+		void please_execute_further();
+};
+
+TypingCounter::TypingCounter(): main_menu_options( { "Typing Counter", "Help", "About", "Exit" } ),
+								time_options( { "Two Minutes", "Four Minutes", "Six Minutes", "No Time Limit" } )
+{
+	__fill_text_info();
+	system("title Typing Counter");
+	main_menu.set_menu("Main Menu", "Wellcome to Typing Counter, Please select to continue!", main_menu_options, no_main_menu_options);
+	time_menu.set_menu("Time Selection", "Please select a time limit to continue!", time_options, no_time_menu_options);
+	wellcome();
+	textbackground(Defaultbk), textcolor(Defaultfg);
+}
+
+void TypingCounter::wellcome(){
+	system( "cls") ;
+	string title, com = "color 07";
+	char dot = 249;
+	ifstream txt( "Tc_db\\theName.tcf" );
+	getline( txt, title, static_cast<char>( EOF ) );
+	_setcursortype( _NOCURSOR );
+	cout << '\a' << endl << endl << title << endl << endl;
+	int x[8] = { SWIDTH/2+1, x[0]+1, x[0]+1, x[0], x[0]-2, x[0]-3, x[0]-3, x[0]-2 }, 
+		y[8] = { wherey(), y[0]+1, y[0]+2, y[0]+3, y[0]+3, y[0]+2, y[0]+1, y[0] };
+	
+	for(int i = 0; i < 8; i++){
+		com[6] = com[6]+1;
+		com[6] = (com[6] == '7')? '8' : com[6];
+		system( com.c_str() );
+		gotoxy( x[i], y[i] ), cout << dot;
+		methods::sleep(1.5);
+	}
+	system( "cls" );
+}
+
+void TypingCounter::start_program_flow(){
+	bool is_new_user;
+	programs_title();
+	user = user_db.get_user( is_new_user );
+	system( "cls" );
+	if( !is_new_user ){
+		int choice;
+		string option_4_old_user[] = { "Show Previos Test\'s reports", "Start a New Type test!" };
+		string title = "Wellcome again "+ user + " what we can do for you?";
+		programs_title();
+		methods::cntr( SWIDTH, title, cout );
+		cout << line;
+		choice = methods::drop_down( option_4_old_user, 2, true, 30 );
+		system( "cls" );
+		if( choice == 0 ){
+			programs_title();
+			methods::cntr( SWIDTH, "Please Select a Report You want to see", cout );
+			cout << line << endl;
+			int report_no = user_db.select_user_statics( user );
+			user_db.download_user_statics( user, typing_statics, report_no );
+			system( "cls" );
+			typing_statics.print_statics( user, cout );
+			textbackground( Defaultfg ), textcolor( Defaultbk );
+			methods::cntr( SWIDTH, "Press CTRL + S to Save this report on Desktop", cout );
+			textbackground( Defaultbk ), textcolor( Defaultfg );
+			if( methods::get_responce() == CTRL_S ){
+				string directory = "";
+				directory = directory + "C:\\Users\\" + getenv("USERNAME") + "\\Desktop\\" + user + "\'s_result.doc";
+				ofstream report( directory.c_str() );
+				typing_statics.print_statics( user, report );
+				report.close();
+				methods::alert( "Report Saved on your Desktop!", true, 30, 1 );
+				getch();
+				system( "cls" );
+			}
+			return;
+		}
+	}
+	/* Logical else :P */
+	init_test_enviroment();
+	start_type();
+	user_db.upload_user_statics( user, typing_statics );
+	typing_statics.print_statics( user, cout );
+	system( "\npause" );
+}
+
+void TypingCounter::init_test_enviroment(){
+	int choice = time_menu.execute();
+	switch(choice){
+		case 0:
+			is_time_apply = true;
+			t_limit = 2 * (CLK_TCK * 60);
+		break;
+		case 1:
+			is_time_apply = true;
+			t_limit = 4 * (CLK_TCK * 60);
+		break;
+		case 2:
+			is_time_apply = true;
+			t_limit = 6 * (CLK_TCK * 60);
+		break;
+		case 3:
+			is_time_apply = false;
+		break;
+	}
+	programs_title();
+	pgraph_db.get_graph( paragraph );
+	system( "cls" );
+}
+
+void TypingCounter::please_execute_further(){
+	main_menu_codes choice;
+	do{
+		try{
+			choice = static_cast<main_menu_codes>( main_menu.execute() );
+			switch( choice ){
+				case START:
+					start_program_flow();	
+				break;
+				case HELP: 
+					show_help();
+				break;
+				case ABOUT: 
+					show_about();
+				break;
+				case EXIT:
+					if( !methods::confirm( "\aAre Sure to Exit" ) )
+						choice = START_FROM_BEGIN;
+				break;
+			}
+		}
+		catch( bool Esc_pressed ){
+			if( Esc_pressed ){
+				choice = START_FROM_BEGIN;
+				textbackground( Defaultbk ), textcolor( Defaultfg );
+			}
+		}
+	}while( choice != EXIT );
+}
+
+void TypingCounter::start_type(){
+	/* data */
+	char 	ich, *word = strtok( const_cast<char*> (paragraph.c_str()), " " ); 	/* a character to be input, and current word from paragraph */
+	int 	index = paragraph.find( word );										/* index num of current word in paragraph */
+	bool 	allgoods;
+	string 	iword;																/* a word's string which entered by user charater by charater */
+	clock_t start_t, end_t;														/* starting & ending time record of typing test */
+	BYTE 	sX, sY, cX, cY;														/* screen's coordinates starting X, current X etc */
+	COLORS	paragraph_bk = BLUE, highlight = LIGHTCYAN;							/* colors used in program */
+	
+	/* show instruction to user about test conduction rules and regulation */{
+		char dot = 249;
+		ostringstream instruction;
+		methods::cntr( 50, "- Please Carefully Read Instruction -", instruction );
+		instruction << setw(50) << setfill(196) << ""
+					<< setw(50) << "";
+		instruction.setf(ios::left); 
+		instruction << dot << setw(49) << " From the paragraph, type the highligted word!"
+					<< dot << setw(49) << " Only current word can be edited, So careful."
+					<< dot << setw(49) << " Do not use Enter or Tab!"
+					<< dot << setw(49) << " When you want to stop test press ENTER.";
+		if(is_time_apply)
+			instruction << dot << setw(49) << " Remember Timer start when you press first key!";
+		instruction << dot << setw(49) << " Best of luck!";
+		instruction.unsetf(ios::left);
+		system("cls");
+		methods::alert(instruction.str(), true, 50, 10);
+		getch();
+	}
+	
+	
+	/* calling procedures & and initiazation of data */
+	system("cls");
+	programs_title();
+	sX = 1, sY = wherey() + 1;							/* before printing save curser pos */
+	textbackground( paragraph_bk );						/* setting color for paragraphs background */
+	draw_paragraph();									/* printing paragraph in a box */
+	textbackground( Defaultbk );						/* after printing para reset backgroung to default */
+	_setcursortype(_SOLIDCURSOR);						
+	cX = wherex(), cY = wherey();						/* save typing areas coordinates */
+	typing_statics.reset();								/* set statics varibles to zero */
+	
+	/* typing procedures */
+	for(allgoods = true,
+		typing_statics.init_type(),															/* initilize date and time of typing */
+		gotoxy(sX, sY), cout << setbk(highlight) << word << setbk(Defaultbk), gotoxy(cX, cY),/* highlight the first word */
+		ich = getche(), start_t = clock(); 													/* when user start type record time */
+		allgoods;																			/* check for breaking signal, applied on */
+		ich = getche()																		/* on every iteration get a character & echo it */
+	)
+	{	/* core procedure */
+		
+		iword += ich;
+		
+		if(ich == ' ' || ich == ENTER){
+			iword.erase( iword.size() - 1, 1);
+			cX = wherex(), cY = wherey();
+			gotoxy( (index % SWIDTH + 1), ( index / SWIDTH + sY) );
+			cout << setbk( paragraph_bk ) << word;
+			
+			if(typing_statics.get_no_of_char() > 0 && iword != "")
+				typing_statics.increment_words();
+				
+			if(iword != word){
+				typing_statics.increment_mistake();
+				int last_word_x = cX-iword.size()-1;
+				if(last_word_x > SWIDTH || last_word_x < 1)
+					gotoxy((SWIDTH + cX)-iword.size()-1 ,cY-1);
+				else
+					gotoxy(last_word_x ,cY);
+				cout << setbk(RED) << iword;
+			} 
+			word = strtok( NULL , " "), iword = "";
+			if(ich == ENTER || word == NULL){
+				end_t = clock();
+				textbackground( Defaultbk );
+				break;
+			}
+			index = (paragraph.find( word, index ) <= index)? paragraph.find( word, index+1 ) : paragraph.find( word, index );
+			gotoxy( (index % SWIDTH + 1), ( index / SWIDTH + sY) );
+			cout << setbk(highlight) << word << setbk(Defaultbk);
+			gotoxy(cX, cY);
+		}
+		else if(iword == "\b")
+			gotoxy( wherex()+1, wherey() ), iword = ""; 	
+		else if(ich == '\b' && iword != "\b")
+			typing_statics.decrement_char(), iword.erase( iword.size() - 2, 2), cout << " \b";
+		else
+			typing_statics.increment_char();
+		if(is_time_apply)
+			for(bool timeup = is_time_up(start_t); !kbhit() && !timeup;)
+				if(is_time_up(start_t)){
+					end_t = clock();
+					textbackground( Defaultbk );
+					_setcursortype(_NORMALCURSOR);
+					methods::alert(">< Your Time is up "+user+"!", 1, 40, 1);
+					methods::sleep(3);
+					allgoods = false;
+					break;
+				}
+	}
+	typing_statics.set_STA( start_t, end_t );
+	system("cls");
+}
+
+#endif
+ /* TypingCounter */

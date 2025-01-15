@@ -1,0 +1,296 @@
+/*
+* File 			: TCutilities
+* Description 	: Console APIs modified for TC by AIM 
+* Contains		: API, methods (Functions), related to console manipulation & menu driven interface.
+* Author 		: AIM
+* Copyright (c) 2016, 2020
+*/
+
+#ifndef TAPI
+#define TAPI
+
+#include "conTools"
+#include<fstream>
+#include<iostream>
+#include<sstream>
+#include<ctime>
+#include<string.h>
+
+#define CNTR_CORD(x, y, w, h) (x = (SWIDTH - w) / 2, y = (SHEIGHT - h) / 2);	/* a macro to calculate cntr's x,y acording to console and object's width & height */
+#define Defaultbk LIGHTGRAY														/* Deafult background for our Application */
+#define Defaultfg LIGHTBLUE														/* Deafult foreground for our Application */
+#define UP 72																	/* Up arrow's ascii code */
+#define DOWN 80																	/* Down arrow's ascii code */
+#define LEFT 75																	/* Left arrow's ascii code */
+#define RIGHT 77																/* Right arrow's ascii code */
+#define ESC 27																	/* ESC (escape) key's ascii code */
+#define ENTER 13																/* Enter key's ascii code */
+#define CTRL_S 19																/* ctrl+s key's ascii code */
+#define BYTE char																/* similar to typdef */
+#define DBOXBK RED																/* Dialogue box's background */
+#define DBOXFG CYAN																/* Dialogue box's foreground */
+
+using namespace std;
+
+namespace methods{																	/* namespace for all method a.k.a function (API)'s for console */
+		
+	void sleep(float seconds){
+		float x = seconds * CLK_TCK + clock();
+		while(x > clock());
+	}
+	
+	void echoCh(int lim, int ch, bool newline = false){								/* for reapting a character n time on console */
+		for(int i = 0; i < lim; i++) cout.put(ch);
+		if(newline) cout<<endl;
+	}
+	
+	void bout(BYTE width, BYTE height, string content = ""){						/* for darwing a rectangular box on console, with an string in box or without */
+		int x1, y1, i, j;
+		x1 = wherex(), y1 = wherey();												/* lock the starting cordinates */
+		(cout.put(218) << setw(width) << setfill(196) << "" ).put(191) << '\n';		/* draw uper line */
+		if(content == "")															/* if there is no string to print in box just print box */
+			for(i=1; i<=height; i++)
+				gotoxy(x1, y1+i), cout.put(179), gotoxy(x1+width+1, y1+i), cout.put(179) << '\n';	
+		else																		/* if there string to place in box go through this procedure */
+			for(i = 1, j = 0; i <= height; i++){
+				gotoxy(x1, y1+i), cout.put(179);
+				for(int k = 0; k < width; k++)
+					try{
+						cout<<content.at(j++);
+					}
+					catch(...){
+						cout<<' ';
+					}
+				cout.put(179) << '\n';
+			}
+		gotoxy(x1, y1+i), (cout.put(192) << setw(width) << setfill(196) << "" ).put(217) << '\n';	/* draw lower line of box */
+	}
+	
+	void bout(BYTE width, BYTE height, BYTE x, BYTE y, string content = ""){						/* to draw box at particular location */
+		gotoxy(x, y), bout(width, height, content);
+	}
+	
+	inline void underline(string word, char delimeter = ' ', bool on_cntr = false){					/* print a word on console with underline */
+		if(on_cntr){																				/* if request to print word at cnter aligned */
+			int x = (SWIDTH - word.size())/2;
+			gotoxy(x, wherey());
+		}
+		int pos = wherex();
+		cout << word << delimeter; gotoxy(pos, wherey() + 1);
+		cout << setw( word.size() ) << setfill( 196 ) << "";
+	}
+	
+	inline void cntr(int width, std::string word, std::ostream& stream){			/* print word on cntr of line on any stream */
+		int field = (width+word.size())/2 +1;
+		stream << setw(field) << word << setw(width-field) << "";
+	}
+	
+	int get_responce(){																/* to take any ascii code from keyboard */
+		int ch = getch();
+		return ch == 224 ? getch() : ch;
+	}
+	
+	void limIN(char str[], int lim){								/* to take limit character from user(automatoc stop after taking lim time character) */
+		char ch;
+		for(int i = 0; i < lim; i++){
+			ch = get_responce();
+			if(ch == ESC)
+				throw bool(true);
+			if(ch == '\b' && i > -1){
+				if(i > 0)
+					cout << "\b \b";
+				i -= 2;
+				continue;
+			}
+			else if(ch != '\b')
+				cout << ch; 
+			str[i] = (ch == '\r')? '\0' : ch;
+			if(ch == '\r')
+				break;
+		}
+		str[ lim ]=0;
+		gotoxy(wherex(), wherey()-1);	
+		
+	}
+	
+	void limIN(string &str, int lim){								/* overloaded form string class */
+		char *nstr = new char[ lim+1 ];
+		limIN(nstr, lim);
+		str = nstr;
+		delete[] nstr;
+	}
+	
+	void alert(string message = "ALERT!!!", bool on_cntr = false, BYTE width = 15, BYTE height = 5){	/* similar aproach to JS alert but for console */
+		if(on_cntr){
+			int x, y;
+			CNTR_CORD(x, y, width, height);
+			gotoxy(x, y);
+		}
+		cout<<'\a';
+		textbackground(DBOXBK), textcolor(DBOXFG);
+		bout(width, height, message);
+		textbackground(Defaultbk), textcolor(Defaultfg);
+	}
+	
+	bool confirm(string message = "Are You Sure?"){						/* similar aproach to JS confirm but for console */	
+		BYTE x, y, width = 40;
+		CNTR_CORD(x, y, width, 2);
+		textbackground(DBOXBK);
+		bout(width, 2, x, y, " ");
+		_setcursortype(_NOCURSOR);
+		gotoxy(x+1, y+1);
+		cout << setw( (width + message.size())/2 ) << message;
+		int responce;
+		bool confirmation = false;
+		gotoxy(x+2, y+2), cout << "|YES|";
+		gotoxy(x+width-4, y+2), cout << "|NO|";
+		do{
+			if(confirmation)
+				gotoxy(x+width-4, y+2), cout << setbk(DBOXBK) << "|NO|",
+				gotoxy(x+2, y+2), cout << setbk(DBOXFG) << "|YES|";
+			else
+				gotoxy(x+2, y+2), cout << setbk(DBOXBK) << "|YES|",
+				gotoxy(x+width-4, y+2), cout << setbk(DBOXFG) << "|NO|";
+			responce = get_responce();
+			if(responce == LEFT)
+				confirmation = true;
+			else if(responce == RIGHT)
+				confirmation = false;
+		}while( responce != ENTER );
+		textcolor(Defaultfg), textbackground(Defaultbk);
+		_setcursortype(_NORMALCURSOR);
+		return confirmation;
+	}
+	
+	void prompt(string &adrs, string message = "Enter: ", bool on_cntr = false, BYTE width = 15){ 	/* similar aproach to JS prompt but for console */
+		int x, y;
+		if(on_cntr){
+			CNTR_CORD(x, y, width, 2);
+			gotoxy(x, y);
+		} 
+		x = wherex();
+		alert(message, false ,width, 2);
+		_setcursortype(_SOLIDCURSOR);
+		gotoxy(x+1, wherey()-2);
+		textbackground(DBOXBK), textcolor(DBOXFG);
+		limIN(adrs, width);
+		textbackground(Defaultbk), textcolor(Defaultfg), _setcursortype(_NORMALCURSOR);
+		gotoxy(x, wherey()+3);
+	}
+	
+	void menu_helper(){																	/* to draw a bar of help at botom of any console (part of menu driven interface) */
+		string help = "";
+		help = help + "Press Esc for Main Menu, " + static_cast<char> (24) 
+			   + " Up, " + static_cast<char> (25) + " Down for navigate, Enter to Select"; 
+		gotoxy(1, SHEIGHT-1);
+		textbackground(Defaultfg), textcolor(Defaultbk);
+		cntr(SWIDTH, help, cout); 
+		textbackground(Defaultbk), textcolor(Defaultfg);
+	}
+	
+	int drop_down(string options[], BYTE n, bool on_cntr = false, BYTE width = 20){		/*  a sub menu, for taking selection from user of n options */
+		if(on_cntr){
+			int x, y;
+			CNTR_CORD(x, y, width, n+2);
+			gotoxy(x, y);
+		}
+		int height = n;
+		BYTE theX = wherex()+1, theY = wherey()+1;
+		bout(width, height);
+		menu_helper();
+		_setcursortype(_NOCURSOR);
+		
+		int responce = -1, choice = 0;
+		
+		do{
+			int cntr;
+			for(int i = 0; i < n; i++){
+				gotoxy(theX , theY+i);
+				cntr = (width + options[i].size()) / 2;
+				if(i == choice)
+					cout << setbk(RED) << setw(cntr) << options[i] << setw(width-cntr) << "";  
+				else 
+					cout << setbk(Defaultbk) << setw(cntr) << options[i] << setw(width-cntr) << "";
+			}
+			gotoxy(theX+width+2, theY+height+2);
+			responce = get_responce();
+			switch(responce){
+				case UP:
+					choice = (choice == 0)? choice-1 : choice;
+				break;
+				case DOWN:
+					choice = (choice < n-1)? choice+1 : choice;
+				break;
+				case ESC:													/* if user press ESC key trow a bool that ESC is pressed will catched by caller */
+					throw bool(true);
+				break;
+			}
+		}while(responce != ENTER); 
+		textcolor(Defaultfg), textbackground(Defaultbk);
+		_setcursortype(_NORMALCURSOR);
+		
+		return choice;
+	}
+
+}
+class menu{																	/* a class for menu, similar to dropdown, but differance is that on every call drop dwon takes arugment, but menu class not */
+	private:
+		string title, quote, *options;
+		int no_of_option;
+		int width, height;
+	protected:
+		int draw_menu(){
+			system("cls");			
+			/* put the title & quote in cntr */
+			cout << setw((SWIDTH - title.size()) / 2 -1) << "\\"; methods::underline(title, '/'); cout << endl; 
+			cout << setw((SWIDTH - quote.size()) / 2 -1) << "\"" << quote << "\"" << endl; 
+			
+			int theX = (SWIDTH - width)/2 + 2, theY = wherey() + 2 + 2; 
+			methods::bout(width+2, height+2, (SWIDTH - width)/2, wherey() + 2);
+			methods::menu_helper();
+			_setcursortype(_NOCURSOR);
+			int responce = -1, choice = 0;
+			
+			do{
+				int cntr;
+				for(int i = 0; i < no_of_option; i++){
+					gotoxy(theX , theY+i);
+					cntr = (width + options[i].size()) / 2;
+					if(i == choice)
+						cout << setbk(RED) << setw(cntr-1) << options[i] << setw(width-cntr) << "" ;  
+					else 
+						cout << setbk(Defaultbk) << setw(cntr-1) << options[i] << setw(width-cntr) << "";
+				}
+				gotoxy(theX+width+2, theY+height+2);
+				responce = methods::get_responce();
+				switch(responce){
+					case UP:
+						choice = (choice)? choice-1 : choice;
+					break;
+					case DOWN:
+						choice = (choice < no_of_option-1)? choice+1 : choice;
+					break;
+					case ESC:
+						throw bool(true);
+					break;
+				}
+			}while(responce != ENTER);
+			textcolor(Defaultfg), textbackground(Defaultbk);
+			_setcursortype(_NORMALCURSOR);
+			
+			system("cls");
+			return choice;
+		}
+	public:
+		void set_menu(string ptitle, string pquote, string *poptions, int n){
+			title = ptitle, quote = pquote, options = poptions, no_of_option = n;
+			if(no_of_option < 8)
+				height = no_of_option+4, width = 40;
+			else
+				no_of_option = 15, height = 15, width = 40;
+		}
+		int execute(){
+			return draw_menu();
+		}
+};
+#endif

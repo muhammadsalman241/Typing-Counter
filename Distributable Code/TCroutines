@@ -1,0 +1,361 @@
+/*
+* File 			: TCroutine
+* Description 	: routine classes & methods which directry link to TypingCounter interface
+* Contains 		: (Typing)statics's class & database controling classes by file handling 
+* Author 		: AIM
+* Copyright (c) 2016, 2020
+*/
+
+#ifndef TROU
+#define TROU
+
+#include "TCutilities"
+
+const string USER_DIRECTORY = "Tc_DB\\users\\";		/* directory where user's databese recorded */
+const string PGRAPH_DIRECTORY = "Tc_DB\\pgraph\\";	/* directory where paragraph's databese recorded */ 
+
+void make_file(const char* name){					/* function to make a new file */
+	ofstream file(name);
+	file.close();	
+}
+
+/* a statics class which hold about result of typing test conduted by typing counter */
+class statics{
+	private:
+		/* integers */
+		int tChar,		/* much character typed */
+			 tWord,		/* much word typed, (word seprated by space) */
+			 mistake;	/* much mistakes, (1 mistake = 1 wrong word) */
+		/* floating points */	 
+		float speed,	/* speed in words per minutes w/m */
+			 tDur, 		/* time duration time taken to type */
+			 accuracy;	/* mistakes per typed word (mistakes/tWords)*100-100 */
+		time_t date;	/* time and date on test occured */
+		
+	public:
+		/* default ctor */
+		statics(): tChar(0), tWord(0), mistake(0), speed(0.0f), tDur(0.0f), accuracy(0.0f), date(0) {}
+		
+		/* set the name of user which is typing, and record the date and time of test */
+		inline void init_type(){
+			time(&date);
+		}
+		
+		inline void increment_char(){		/* increment the typed characters, inline for saving time */
+			++tChar;
+		}
+		
+		inline void decrement_char(){		/* increment the typed characters, inline for saving time */
+			--tChar;
+		}
+		
+		inline int get_no_of_char(){		/* return the typed characters, inline for saving time */
+			return tChar;
+		}
+		
+		inline void increment_words(){		/* increment the typed words, inline for saving time */
+			++tWord;
+		}
+		
+		inline void increment_mistake(){	/* increment the typing mistakes in words, inline for saving time */
+			++mistake;
+		}
+		
+		/* set_STA means set Speed Time_duration and accuracy, takes starting and ending time of type test and calculate others! */
+		inline void set_STA(clock_t startT, clock_t endT){
+			tDur = (endT - startT) / static_cast<float> (CLK_TCK);
+			speed = (tWord == 0)? 0.0f : tWord / (tDur/60);
+			accuracy = (tWord == 0)? 0.0f: 100.0f - mistake / static_cast<float> (tWord) * 100.0f;
+		}
+		
+		inline char* get_date(){			/* return string of date and time and remove newline char in string */
+			char *time_str = ctime(&date);
+			time_str[24] = 0;
+			return time_str;
+		}
+		
+		inline void reset(){
+			tChar = tWord = mistake = speed = tDur = accuracy = date = 0;
+		}
+		
+		void print_statics(string typer_name, ostream& stream){	/* print result stored in intance on any stream */
+			methods::cntr(SWIDTH, "< Typing Counter >", stream);
+			methods::echoCh(SWIDTH, '_', stream);
+			methods::cntr(SWIDTH, "Report/Result of typing test conducted by Typing Counter", stream);
+			stream << endl << endl;
+			
+			stream << "Metadata:\n"; methods::echoCh(9, '-', true); stream << endl;
+			
+			stream << setw(25) << left << "Typer Name" << ": "  << typer_name << endl
+				   << setw(25) << left << "Typed On"   << ": "  << get_date() << endl;
+			stream << endl << endl;
+			
+			stream << "The data:\n";  methods::echoCh(9, '-', true); stream << endl;
+			
+			stream  << setw(25) << left << "Letter Typed" 			<< ": " << tChar << endl
+					<< setw(25) << left << "Total Words Typed" 		<< ": " << tWord << endl
+					<< setw(25) << left << "Wrong Words Typed" 		<< ": " << mistake << endl
+					<< setw(25) << left << "Average Typing Speed" 	<< ": " << speed << " WPM" << endl
+					<< setw(25) << left << "Average Accuracy" 		<< ": " << accuracy << '%' << endl
+					<< setw(25) << left << "Time Consumed" 			<< ": " 
+										<< static_cast<int>(tDur) 	<< " in Seconds, "
+										<< tDur/60 << " in Minutes " << endl;
+			stream << endl << endl;
+			methods::cntr(SWIDTH, "Thanks for using Typing Counter By AIM!", stream);
+			stream << endl << right;
+			methods::echoCh(SWIDTH, '_', stream);
+		}
+};
+
+class user_handler{				/* handle the user database, that how many users we have and detail of every test conducted by typing counter */
+	private:
+		int no_of_users;
+		string *users;
+		fstream sobj;
+		
+		void update_meta(){
+			sobj.seekg(0, ios::beg);
+			sobj>>no_of_users;
+			if(users != NULL) 
+				delete[] users;
+			users = new string[no_of_users];
+			for(int i=0; i<no_of_users && !sobj.eof(); i++)
+				sobj>>users[i];
+		}
+		
+		bool is_user_avail(string uname){
+			for(int i=0; i<no_of_users; i++)
+				if(users[i] == uname)
+					return true;
+			return false;
+		}
+	
+	public:
+		user_handler(): sobj((USER_DIRECTORY + "index.mtd").c_str(), ios::in | ios::out), users(NULL){
+			if(!sobj.is_open()){
+				make_file((USER_DIRECTORY + "index.mtd").c_str()), 
+				sobj.open((USER_DIRECTORY + "index.mtd").c_str(), ios::in | ios::out); 
+				no_of_users = 0;
+				sobj<<no_of_users;
+			}
+			else{
+				update_meta();
+			}
+		}
+		
+		~user_handler(){
+			if(users != NULL) 
+				delete[] users;
+			sobj.close();
+		}
+		
+		
+		bool insert_user(string name){
+			for(int i = name.find(" "); i != -1; i = name.find(" "))	/* remove spaces */
+				name[i] = '_';
+			if(!is_user_avail(name)){
+				int i;
+				sobj.seekg(0, ios::beg), sobj>>i;
+				sobj.seekg(0, ios::beg), sobj<<(++i);
+				sobj.seekp(0, ios::end), sobj<<endl<<name;
+				make_file((USER_DIRECTORY+name+".dta").c_str());
+				update_meta();
+				return true;
+			}
+			return false;
+		}
+		
+		void upload_user_statics(string uname, statics s){
+			if(is_user_avail(uname)){
+				ofstream user_node((USER_DIRECTORY+uname+".dta").c_str(), ios::out | ios::app | ios::binary);
+				user_node.write( reinterpret_cast<char*> (&s), sizeof(s));
+				user_node.close();
+			}
+		}
+		
+		void download_user_statics(string uname, statics &s, int index){
+			if(is_user_avail(uname)){
+				ifstream user_node((USER_DIRECTORY+uname+".dta").c_str(), ios::in | ios::ate | ios::binary);
+				int pos = int(user_node.tellg());
+				pos = index ? (pos / ( index * sizeof s ) - pos) : 0;
+				user_node.seekg(pos, ios::beg);
+				user_node.read( reinterpret_cast<char*> (&s), sizeof(s));
+				user_node.close();
+			}
+		}
+		
+		int select_user_statics(string uname){
+			if(is_user_avail(uname)){
+				ifstream user_node((USER_DIRECTORY+uname+".dta").c_str(), ios::out | ios::ate | ios::binary);
+				int nstatics = static_cast<int>(user_node.tellg()) / sizeof(statics),
+					selection;
+				nstatics = ( nstatics == 0 && static_cast<int> (user_node.tellg()) > 1 )? 1 : nstatics;
+				if(nstatics == 0){
+					methods::alert("Sorry you have no previou history!!", true, 35,1);
+					getch();
+					throw bool(true);
+				}
+				string *arrs = new string[nstatics];
+				statics temp;
+				
+				user_node.seekg(0, ios::beg);
+				for(int i=0; i<nstatics; i++){
+					user_node.read(reinterpret_cast<char*> (&temp), sizeof(temp));
+					arrs[i] = temp.get_date();
+				}
+				user_node.close();
+				gotoxy(1, wherey()+1);
+				selection = methods::drop_down(arrs, nstatics, true, 30);
+				delete[] arrs;
+				system("cls");
+				return selection;
+			}
+			return -1;
+		}
+		
+		string get_user(bool& is_it_new){
+			string *arr = new string[no_of_users+1];
+			int selection;
+			for(int i=0; i<no_of_users; i++)
+				arr[i] = users[i];
+			arr[no_of_users] = "New User?";
+			
+			methods::cntr(SWIDTH, "Please Select User's Name", cout);
+			cout << line;
+			selection = methods::drop_down(arr, no_of_users+1, true, 40);
+			delete[] arr;
+			
+			if(selection == no_of_users){
+				string new_user;
+				int location = wherey()+2;
+				for(;; gotoxy(1, location), methods::alert("Chose another Name! |ENTER|", true, 40, 2), getch()){
+					gotoxy(1, location);
+					methods::prompt(new_user, "Enter Your Name:", true, 40);
+					if(insert_user(new_user))
+						break;
+				}
+				is_it_new = true;
+				return users[ selection ];
+			}
+			else{
+				is_it_new = false;
+				return users[ selection ];
+			}
+		}
+};
+
+class graph_handler{			/* handle the Paragraph's database, that how many paragrpah we have */
+	private:
+		int no_of_graph;
+		string *graphs;
+		fstream sobj;
+
+		void update_meta(){
+			sobj.seekg(0, ios::beg);
+			sobj>>no_of_graph;
+			if(graphs != NULL) 
+				delete[] graphs;
+			graphs = new string[no_of_graph];
+			for(int i=0; i<no_of_graph && !sobj.eof(); i++)
+				sobj>>graphs[i];
+		}
+		
+		bool is_graph_avail(string gname){
+			for(int i=0; i<no_of_graph; i++)
+				if(graphs[i] == gname)
+					return true;
+			return false;
+		}
+		
+		void download_graph(string &str, int index){
+			if(index <= no_of_graph){
+				ifstream graph_node((PGRAPH_DIRECTORY+graphs[index]+".dta").c_str());
+				getline(graph_node, str, static_cast<char>(EOF));
+				graph_node.close();
+			}
+		}
+	
+		bool insert_graph(string name, string adrs){
+			fstream stream(adrs.c_str());
+			for(int i = name.find(" "); i != -1; i = name.find(" "))
+				name[i] = '_';
+			if(!is_graph_avail(name) && stream.is_open()){
+				int i, max_len_of_file = (SHEIGHT - 3)/2 * SWIDTH;
+				string data;
+				
+				sobj.seekg(0, ios::beg), sobj>>i;
+				sobj.seekg(0, ios::beg), sobj<<(++i);
+				sobj.seekp(0, ios::end), sobj<<endl<<name;
+				
+				make_file((PGRAPH_DIRECTORY+name+".dta").c_str());
+				getline(stream, data, static_cast<char>(EOF));
+				stream.close();
+				stream.open((PGRAPH_DIRECTORY+name+".dta").c_str());
+				
+				for(int i = data.find('\n'); i != -1; i = data.find('\n')) 
+					data.erase(i, 1);
+				for(int i = data.find('\t'); i != -1; i = data.find('\t')) 
+					data.erase(i, 1);
+				if(data.size() > max_len_of_file)
+					data = data.substr(0, max_len_of_file);
+				stream<<data;
+				stream.close();
+				update_meta();
+				return true;
+			}
+			stream.close();
+			return false;
+		}
+	public:
+		graph_handler(): sobj((PGRAPH_DIRECTORY+"index.mtd").c_str(), ios::in | ios::out), graphs(NULL){
+			if(!sobj.is_open()){
+				make_file((PGRAPH_DIRECTORY+"index.mtd").c_str()), 
+				sobj.open((PGRAPH_DIRECTORY+"index.mtd").c_str(), ios::in | ios::out); 
+				no_of_graph = 0;
+				sobj<<0;
+			}
+			else{
+				update_meta();
+			}
+		}
+		
+		~graph_handler(){
+			if(graphs != NULL) 
+				delete[] graphs;
+			sobj.close();
+		}
+
+		
+		
+		void get_graph(string& paragraph){
+			string *arr = new string[no_of_graph+1];
+			int selection;
+			for(int i=0; i<no_of_graph; i++)
+				arr[i] = graphs[i];
+			arr[no_of_graph] = "Add your from Windows!";
+		
+			methods::cntr(SWIDTH, "Please Select Paragraph which you want to use!!", cout);
+			cout << line;
+			selection = methods::drop_down(arr, no_of_graph+1, true, 40);
+			delete[] arr;
+			
+			if(selection == no_of_graph){
+				string new_graph, adrs;
+				int locationx = wherex()-40, locationy = wherey();
+				for(;; gotoxy(locationx, locationy), methods::alert("Try again press |ENTER|", false, 40, 2), getch()){
+					gotoxy(locationx, locationy);
+					methods::prompt(new_graph, "Enter Parapragh Name:", false, 40);
+					gotoxy(locationx, locationy);
+					methods::prompt(adrs, "Enter Adress i-e(D:\\\\abc.txt):", false, 40);
+					if(insert_graph(new_graph, adrs))
+						break;
+				}
+				
+				download_graph(paragraph, selection);
+			}
+			else
+				download_graph(paragraph, selection);
+		}
+};
+
+#endif

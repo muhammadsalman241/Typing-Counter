@@ -1,0 +1,188 @@
+/*
+* File name: ConTools (Console Tools)
+* taken from: sourceforge.net 
+* Auther: Hongli Lai
+* Description: provide borland style conio function for mingw (open-source) and some alteration!
+*/
+
+#ifndef CON_TOOLS
+#define CON_TOOLS
+
+#include <wtypesbase.h>
+#include <wincon.h>
+#include <processenv.h>
+#include <conio.h>
+#include <iostream>
+
+#define SWIDTH __text_info.screenwidth		/* shortcut for screen width */
+#define SHEIGHT __text_info.screenheight	/* shortcut for screen height */
+
+#define _NOCURSOR 0         /**< no cursor */
+#define _SOLIDCURSOR 100    /**< cursor filling whole cell */
+#define _NORMALCURSOR 20    /**< cursor filling 20 percent of cell height */
+
+
+struct text_info {
+    unsigned char curx;          /**< cursor coordinate x */
+    unsigned char cury;          /**< cursor coordinate y */
+    unsigned char screenwidth;   /**< screen width */
+    unsigned char screenheight;  /**< screen height */
+};
+
+typedef enum{
+    BLACK,          /**< black color */
+    BLUE,           /**< blue color */
+    GREEN,          /**< green color */
+    CYAN,           /**< cyan color */
+    RED,            /**< red color */
+    MAGENTA,        /**< magenta color */
+    BROWN,          /**< brown color */
+    LIGHTGRAY,      /**< light gray color */
+    DARKGRAY,       /**< dark gray color */
+    LIGHTBLUE,      /**< light blue color */
+    LIGHTGREEN,     /**< light green color */
+    LIGHTCYAN,      /**< light cyan color */
+    LIGHTRED,       /**< light red color */
+    LIGHTMAGENTA,   /**< light magenta color */
+    YELLOW,         /**< yellow color */
+    WHITE           /**< white color */
+} COLORS;
+
+static struct text_info __text_info = { 1, 1, 80, 25 };
+
+static int __BACKGROUND = BLACK;
+static int __FOREGROUND = LIGHTGRAY;
+
+static int __CONIO_TOP = 0;
+static int __CONIO_LEFT = 0;
+
+
+
+void gotoxy(int x, int y){
+  COORD c;
+
+  c.X = __CONIO_LEFT + x - 1;
+  c.Y = __CONIO_TOP  + y - 1;
+  SetConsoleCursorPosition (GetStdHandle(STD_OUTPUT_HANDLE), c);
+}
+
+void textbackground (int color){
+    __BACKGROUND = color;
+    SetConsoleTextAttribute (GetStdHandle (STD_OUTPUT_HANDLE),
+      __FOREGROUND + (color << 4));
+}
+
+
+void textcolor (int color){
+    __FOREGROUND = color;
+    SetConsoleTextAttribute (GetStdHandle (STD_OUTPUT_HANDLE),
+      color + (__BACKGROUND << 4));
+}
+
+static void __fill_text_info(){
+    CONSOLE_SCREEN_BUFFER_INFO info;
+
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+    __CONIO_LEFT = info.srWindow.Left;
+    __CONIO_TOP = info.srWindow.Top;
+    __text_info.curx = info.dwCursorPosition.X - __CONIO_LEFT + 1;
+    __text_info.cury = info.dwCursorPosition.Y - __CONIO_TOP  + 1;
+    __text_info.screenwidth  = info.srWindow.Right - info.srWindow.Left + 1;
+    __text_info.screenheight = info.srWindow.Bottom - info.srWindow.Top + 1;
+}
+
+int wherex(){
+    __fill_text_info();
+    return __text_info.curx;
+}
+
+
+int wherey(){
+    __fill_text_info();
+    return __text_info.cury;
+}
+
+void _setcursortype(int type){
+    CONSOLE_CURSOR_INFO Info;
+
+    if (type == 0) {
+        Info.bVisible = FALSE;
+    } else {
+      Info.dwSize = type;
+      Info.bVisible = TRUE;
+    }
+    SetConsoleCursorInfo (GetStdHandle (STD_OUTPUT_HANDLE), &Info);
+}
+
+
+
+struct _Setxy { int x,y; };
+/// setxy manipulator
+/// @see gotoxy
+inline _Setxy setxy (int x, int y) {
+    _Setxy z; z.x = x; z.y = y; return z;
+}
+
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT,Traits>& operator<<(std::basic_ostream<CharT,Traits>& o, _Setxy f) {
+    ::gotoxy (f.x, f.y);
+    return o;
+}
+
+
+struct _Setclr { int color; };
+/// setclr manipulator
+/// @see textcolor
+inline _Setclr setclr (int color) {
+    _Setclr x; x.color = color; return x;
+}
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT,Traits>& operator<<(std::basic_ostream<CharT,Traits>& o, _Setclr f) {
+    ::textcolor (f.color);
+    return o;
+}
+
+struct _Setbk { int color; };
+/// setbk manipulator
+/// @see textbackground
+inline _Setbk setbk (int color) {
+    _Setbk x; x.color = color; return x;
+}
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT,Traits>& operator<<(std::basic_ostream<CharT,Traits>& o, _Setbk f) {
+    ::textbackground (f.color);
+    return o;
+}
+
+struct _Setw { int w; };
+/// setbk manipulator
+/// @see textbackground
+inline _Setw setw (int n) {
+    _Setw x = {n}; return x;
+}
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT,Traits>& operator<<(std::basic_ostream<CharT,Traits>& o, _Setw f) {
+    o.width(f.w);
+    o.fill(' ');
+    return o;
+}
+
+struct _Setfill{ char f; };
+/// setbk manipulator
+/// @see textbackground
+inline _Setfill setfill(char f) {
+    _Setfill x={f}; return x;
+}
+template<typename CharT, typename Traits>
+inline std::basic_ostream<CharT,Traits>& operator<<(std::basic_ostream<CharT,Traits>& o, _Setfill f) {
+    o.fill(f.f);
+    return o;
+}
+
+/* to print horizontal line at console */
+inline std::ostream& line(std::ostream& stream){
+	stream<<setw(SWIDTH)<<setfill(196)<<"";
+	return stream;	
+}
+
+#endif
